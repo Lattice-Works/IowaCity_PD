@@ -27,8 +27,8 @@ public class NameParsing {
     }
 
     public static final Pattern p = Pattern
-            .compile( "\\b(UNIVERSITY|EMS|ENGINE|FIRE|RESCUE|JCAS|AMB|JCSO|UNITS|UI|DPS|HONDA|LP|REHABILITATION|INC|IOWA|ADT|VERIZON|SPRINT|SANDWICHES|AT&T|BLDG|CENTER|CELLULAR|INTERNATIONAL|SCIENCES)\\b" , Pattern.CASE_INSENSITIVE );
-
+            .compile( "\\b(?i)(UNIVERSITY|EMS|ENGINE|FIRE|RESCUE|JCAS|AMB|JCSO|UNITS|UI|DPS|HONDA|LP|REHABILITATION|INC|IOWA|ADT|VERIZON|SPRINT|SANDWICHES|AT&T|BLDG|CENTER|CELLULAR|INTERNATIONAL|SCIENCES|Department|Jsco|Coralville|Jail|truck)\\b" , Pattern.CASE_INSENSITIVE );
+            //exclude the above words. The (?i) at front makes it case insensitive.
 
 
 

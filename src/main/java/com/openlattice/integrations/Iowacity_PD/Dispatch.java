@@ -23,11 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.LocalTime;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 
@@ -50,19 +46,19 @@ public class Dispatch {
 
     private static final Environment environment = Environment.LOCAL;
 
-    private static final DateTimeHelper dateHelper0 = new DateTimeHelper( TimeZones.America_Chicago,
+    private static final DateTimeHelper     dateHelper0 = new DateTimeHelper( TimeZones.America_Chicago,
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
     private static final JavaDateTimeHelper timeHelper0 = new JavaDateTimeHelper( TimeZones.America_Chicago,
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
 
     public static void main( String[] args ) throws InterruptedException, IOException {
 
-//        final String username = args[ 1 ];
-//        final String password = args[ 2 ];
-//        final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Athena
-//        final String integrationFile = args[ 3 ];                                     //for running on Athena
-                        final String jwtToken = args[ 0 ];              //for local testing
-                        final String integrationFile = args[ 1 ];       //for local testing
+                final String username = args[ 1 ];
+                final String password = args[ 2 ];
+                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Athena
+                final String integrationFile = args[ 3 ];                                     //for running on Athena
+//        final String jwtToken = args[ 0 ];              //for local testing
+//        final String integrationFile = args[ 1 ];       //for local testing
 
         HikariDataSource hds =
                 ObjectMappers.getYamlMapper()
@@ -81,14 +77,18 @@ public class Dispatch {
         Payload nonUnitPayload = new SimplePayload( fp.stream().filter( row -> !containsUnit( row ) ) );
 
         List<Map<String, String>> fp2 = personPayload.getPayload().collect( Collectors.toList() );
-        Payload vehiclePeepsPayload = new SimplePayload( fp2.stream()
-                .filter( row -> containsVehicle( row ) && containsPerson( row ) ) );
-        Payload vehicleNoPeepsPayload = new SimplePayload( fp2.stream()
-                .filter( row -> containsVehicle( row ) && !containsPerson( row ) ) );
-        Payload noVehiclePeepsPayload = new SimplePayload( fp2.stream()
-                .filter( row -> !containsVehicle( row ) && containsPerson( row ) ) );
-        Payload noVehicleNoPeepsPayload = new SimplePayload( fp2.stream()
-                .filter( row -> !containsVehicle( row ) && !containsPerson( row ) ) );
+        Payload officersVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> containsVehicle( row ) && containsOfficer( row ) ) );
+        Payload officersNoVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> !containsVehicle( row ) && containsOfficer( row ) ) );
+        Payload othersVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> containsVehicle( row ) && containsOtherPerson( row ) ) );
+        Payload othersNoVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> !containsVehicle( row ) && containsOtherPerson( row ) ) );
+        Payload noPeopleVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) ) );
+        Payload noPeoplenoVehiclePayload = new SimplePayload( fp2.stream()
+                .filter( row -> !containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) ) );
 
         //Payload dispatchPayload = new FilterablePayload( dispatchPath );
         //        Map<String, String> caseIdToTime = dispatchPayload.getPayload()
@@ -96,10 +96,10 @@ public class Dispatch {
 
         // @formatter:off
         Flight sysuserbaseMapping = Flight     //entities = personnel, person. associations = person is personnel
-                .newFlight()
+                .newFlight("sysuserbaseMapping")
                     .createEntities()
                         .addEntity("Personnelsysuserbase")
-                            .to("IowaCityJusticeInvolvedPersonnel")
+                            .to("IowaCityJIPersonnel")
 //                            .useCurrentSync()
                             .addProperty("publicsafety.personnelid", "OfficerId")
                             .addProperty("publicsafety.personneltitle", "Title")
@@ -110,7 +110,7 @@ public class Dispatch {
                                .value( row -> getEmployeeId( row.getAs( "EmployeeId" ) ) ).ok()
                         .endEntity()
                         .addEntity( "Peoplesysuserbase" )
-                        .to("IowaCityPeople")
+                        .to("IowaCityPeople1")
 //                        .useCurrentSync()
                         .addProperty("nc.PersonGivenName")
                             .value( row -> getFirstName( row.getAs( "FirstName" ) ) ).ok()
@@ -122,7 +122,7 @@ public class Dispatch {
                 .createAssociations()
                     .addAssociation( "isCJemployee" )
 //                    .useCurrentSync()
-                    .to("IowaCityIsCJemployee")
+                    .to("IowaCityIs")
                     .fromEntity( "Peoplesysuserbase" )
                     .toEntity( "Personnelsysuserbase" )
                     .addProperty( "general.stringid", "OfficerId" )
@@ -133,7 +133,7 @@ public class Dispatch {
 
         // @formatter:off
         Flight dispatchMapping = Flight         //entities = dispatch, JI personnel (operators), dispatch zone, CFS origin
-                .newFlight()
+                .newFlight("dispatchMapping")
                     .createEntities()
                         .addEntity("CallForService")
                             .to("IowaCityCallForService")
@@ -144,7 +144,7 @@ public class Dispatch {
                             .addProperty("publicsafety.cfscasenumber", "Case_Number")
                             .addProperty( "publicsafety.cfscaseid", "Case_ID" )
                             .addProperty("publicsafety.dispatchhowreported", "HowReported")
-                            .addProperty("datetime.received")
+                            .addProperty("date.received")
                                 .value( row -> dateHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
                             .addProperty( "date.dayofweek" )
                                 .value( row -> getDayOfWeek( ( dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ) ) )
@@ -180,8 +180,8 @@ public class Dispatch {
                             .addProperty("publicsafety.firedistrictname", "FireDistrict")
                             .addProperty("publicsafety.firedistrictcode", "ESN")
                         .endEntity()
-                         .addEntity( "Officers" )
-                            .to("IowaCityPeople")
+                        .addEntity( "Officers" )
+                            .to("IowaCityPeople1")
 //                            .useCurrentSync()
                             .addProperty( "nc.SubjectIdentification", "AssignedOfficerID" )
                                //.value( row -> UUID.randomUUID().toString() ).ok()
@@ -191,7 +191,7 @@ public class Dispatch {
                                 .value( row -> getLastName( row.getAs( "ASSIGNED_OFFICER" ) ) ).ok()
                         .endEntity()
                         .addEntity("Operator")
-                            .to("IowaCityPeople")
+                            .to("IowaCityPeople1")
 //                            .useCurrentSync()
                             .addProperty( "nc.SubjectIdentification", "Operator" )
                              //  .value( row -> UUID.randomUUID().toString() ).ok()
@@ -203,14 +203,14 @@ public class Dispatch {
                                 .value( row -> getMiddleName( row.getAs( "Operator" ) ) ).ok()
                         .endEntity()
                         .addEntity("Personneldispatch1")
-                            .to("IowaCityJusticeInvolvedPersonnel")
+                            .to("IowaCityJIPersonnel")
 //                            .useCurrentSync()
                             .addProperty( "publicsafety.personnelid" , "AssignedOfficerID")
                             .addProperty( "publicsafety.officerbadgeid" ).value( row -> getBadgeNumber( row.getAs("ASSIGNED_OFFICER") ) ).ok()
                             .addProperty( "publicsafety.personneltitle" ).value(row -> "Officer" ).ok()
                         .endEntity()
                         .addEntity( "Personneldispatch2" )
-                            .to("IowaCityJusticeInvolvedPersonnel")
+                            .to("IowaCityJIPersonnel")
 //                            .useCurrentSync()
                             .addProperty( "publicsafety.personnelid" , "Operator")      //no other identifying info for Operators in this table
                             .addProperty( "publicsafety.personneltitle" ).value(row -> "Operator" ).ok()
@@ -267,21 +267,22 @@ public class Dispatch {
                             .addProperty( "contact.id", "Dis_ID" )
                         .endAssociation()
                         .addAssociation("ZonedWithin")
-                            .ofType("geo.zonedwithin").to("IowaCityZonedWithin")
+                                .ofType("geo.zonedwithin").to("IowaCityZonedWithin")
 //                            .useCurrentSync()
                             .fromEntity("CallForService")
                             .toEntity("DispatchZone")
-                            .addProperty("general.stringid", "Dis_ID")
+//                            .addProperty("general.stringid", "Dis_ID")
+                            .addProperty( "general.stringid", "ZONE_ID" )
                         .endAssociation()
                         .addAssociation( "is1" )
-                            .ofType( "ol.is" ).to("IowaCityIsCJemployee")
+                            .ofType( "ol.is" ).to("IowaCityIs")
 //                            .useCurrentSync()
                             .fromEntity( "Officers" )
                             .toEntity( "Personneldispatch1" )
                             .addProperty( "general.stringid", "AssignedOfficerID" )
                         .endAssociation()
                     .addAssociation( "is2" )
-                            .ofType( "ol.is" ).to("IowaCityIsCJemployee")
+                            .ofType( "ol.is" ).to("IowaCityIs")
 //                            .useCurrentSync()
                             .fromEntity( "Operator" )
                             .toEntity( "Personneldispatch2" )
@@ -292,7 +293,7 @@ public class Dispatch {
 //                            .useCurrentSync()
                             .fromEntity( "CallForService" )
                             .toEntity("Operator")
-                            .addProperty( "datetime.received" ).value( row -> dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
+                            .addProperty( "datetime.received" ).value( row -> dateHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
                         .endAssociation()
                      .addAssociation( "AppearsinDispatch1" )
                             .ofType( "general.appearsin" ).to("IowaCityCFSAppearsIn")
@@ -318,19 +319,19 @@ public class Dispatch {
 
         // @formatter:off
         Flight nonUnitMapping = Flight     //entities = CFS, personnel, person. associations = appear in (personnel in CFS), person works as JI personnel
-                .newFlight()
+                .newFlight("nonUnitMapping")
                     .createEntities()
                         .addEntity("CallForServiceDistype")
                             .to("IowaCityCallForService")
 //                            .useCurrentSync()
                             .addProperty( "publicsafety.dispatchid" , "Dis_ID")
-                            .addProperty("datetime.alerted")
+                            .addProperty("time.alerted")
                                 .value(  row -> timeHelper0.parseTime( row.getAs( "TimeDisp" ) ) ).ok()
-                            .addProperty("datetime.enroute")
+                            .addProperty("time.enroute")
                                 .value( row -> timeHelper0.parseTime( row.getAs( "TimeEnroute" ) ) ).ok()
-                            .addProperty( "datetime.arrived" )
+                            .addProperty( "time.arrived" )
                                 .value( row -> timeHelper0.parseTime( row.getAs( "TimeArr" ) ) ).ok()
-                            .addProperty("date.completeddatetime")
+                            .addProperty("time.completed")
                                 .value( row -> timeHelper0.parseTime( row.getAs( "TimeComp" ) ) ).ok()
                             .addProperty("publicsafety.dispatchtypeid", "Dispatch_Type_ID")
                             .addProperty("publicsafety.dispatchtype", "Type_ID")
@@ -342,14 +343,14 @@ public class Dispatch {
                             //.addProperty( "event.comments" ).value(row -> "B" ).ok()
                         .endEntity()
                         .addEntity( "PersonnelDistype" )
-                            .to( "IowaCityJusticeInvolvedPersonnel" )
+                            .to( "IowaCityJIPersonnel" )
 //                            .useCurrentSync()
                             .addProperty( "publicsafety.officerbadgeid")
                                .value( row -> getBadgeNumber( row.getAs("Unit") ) ).ok()
                             .addProperty( "publicsafety.personnelid", "OfficerID" )     //in dispatch_type table, every person has an officerID.
                         .endEntity()
                         .addEntity( "PeopleDistype" )
-                            .to("IowaCityPeople")
+                            .to("IowaCityPeople1")
 //                            .useCurrentSync()
                             .addProperty("nc.PersonGivenName")
                                 .value( row -> getFirstName( row.getAs( "Unit" ) ) ).ok()
@@ -365,7 +366,7 @@ public class Dispatch {
 
                     .createAssociations()    // associations = appear in (personnel in CFS), person works as JI personnel
                         .addAssociation("IsDistype")
-                            .ofType("ol.is").to("IowaCityIsCJemployee")
+                            .ofType("ol.is").to("IowaCityIs")
 //                            .useCurrentSync()
                             .fromEntity("PeopleDistype")
                             .toEntity("PersonnelDistype")
@@ -384,30 +385,30 @@ public class Dispatch {
 
                     .endAssociations()
                 .done();
-        // @formatter:on
+
 
         Flight unitMapping = Flight
-                .newFlight()
+                .newFlight( "unitMapping" )
                 .createEntities()
                 .addEntity( "Unit" )
                     .to( "IowaCityUnit" )
                     .addProperty( "publicsafety.unitid" )   //Dis+ID+time recvd+time comp
-                        .value( Dispatch::getUnitID ).ok()
+                    .value( Dispatch::getUnitID ).ok()
                     .addProperty( "publicsafety.unitname" ).value( row -> {
-                        return Parsers.getAsString( row.getAs( "Unit" ));
-                    }).ok()
+                        return Parsers.getAsString( row.getAs( "Unit" ) );
+                    } ).ok()
                 .endEntity()
                 .addEntity( "cfsUnit" )
                     .to( "IowaCityCallForService" )
-//                    .useCurrentSync()
+                    //                    .useCurrentSync()
                     .addProperty( "publicsafety.dispatchid", "Dis_ID" )
-                    .addProperty( "datetime.alerted" )
+                    .addProperty( "time.alerted" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeDisp" ) ) ).ok()
-                    .addProperty( "datetime.enroute" )
+                    .addProperty( "time.enroute" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeEnroute" ) ) ).ok()
-                    .addProperty( "datetime.arrived" )
+                    .addProperty( "time.arrived" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeArr" ) ) ).ok()
-                    .addProperty( "date.completeddatetime" )
+                    .addProperty( "time.completed" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeComp" ) ) ).ok()
                     .addProperty( "publicsafety.dispatchtypeid", "Dispatch_Type_ID" )
                     .addProperty( "publicsafety.dispatchtype", "Type_ID" )
@@ -424,168 +425,32 @@ public class Dispatch {
 
                 .addAssociation( "AppearsinDistype2" )
                     .ofType( "general.appearsin" ).to( "IowaCityCFSAppearsIn" )
-//                    .useCurrentSync()
+                    //                    .useCurrentSync()
                     .fromEntity( "Unit" )
                     .toEntity( "cfsUnit" )
                     .addProperty( "general.stringid" ).value( Dispatch::getUnitID ).ok()
-                    .addProperty( "datetime.alerted" )
+                    .addProperty( "time.alerted" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeDisp" ) ) ).ok()
-                    .addProperty( "datetime.enroute" )
+                    .addProperty( "time.enroute" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeEnroute" ) ) ).ok()
-                    .addProperty( "datetime.arrived" )
+                    .addProperty( "time.arrived" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeArr" ) ) ).ok()
-                    .addProperty( "date.completeddatetime" )
+                    .addProperty( "time.completed" )
                         .value( row -> timeHelper0.parseTime( row.getAs( "TimeComp" ) ) ).ok()
                 .endAssociation()
                 .endAssociations()
                 .done();
 
         // @formatter:off
-        Flight noVehiclePeepsMapping = Flight        //entitites = CFS origin, person, originating address, contact info, vehicle.  Associations = originating at, involved in (vehicle info), appears in (personnel in CFS)
-                .newFlight()
-                    .createEntities()
-                       .addEntity( "Personperson" )
-                             .to( "IowaCityPeople" )
-//                             .useCurrentSync()
-                             .addProperty( "nc.SubjectIdentification")
-                                .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
-                             .addProperty( "nc.PersonGivenName" )
-                                .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
-                             .addProperty( "nc.PersonMiddleName" )
-                                .value( row -> getMiddleName( row.getAs( "OName" ) ) ).ok()
-                             .addProperty( "nc.PersonSurName" )
-                                .value( row -> getLastName( row.getAs( "OName" ) ) ).ok()
-                            .addProperty( "im.PersonNickName" )
-                                .value( row -> getName( row.getAs( "OName" ) ) ).ok()
-                            .addProperty( "nc.PersonBirthDate" )
-                                .value( row -> dateHelper0.parseLocalDate( row.getAs( "DOB" ) ) ).ok()
-                            .addProperty( "nc.SSN", "SSN" )
-                            .addProperty( "nc.PersonSex", "OSex" )
-                            .addProperty( "nc.PersonRace", "ORace" )
-                            .addProperty( "nc.PersonEthnicity", "Ethnicity" )
-                            .addProperty( "nc.PersonEyeColorText", "Eyes" )
-                            .addProperty( "nc.PersonHairColorText", "Hair" )
-                            .addProperty( "nc.PersonHeightMeasure" )
-                                //.value( row -> getHeightInch( row.getAs( "Height" ) ) ).ok()
-                                .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
-                            .addProperty( "nc.PersonWeightMeasure" )
-                                .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
-                            .addProperty( "person.stateidnumber", "MNI_No" )
-                       .endEntity()
-                       .addEntity( "Personnelperson" )
-                            .to( "IowaCityJusticeInvolvedPersonnel" )
-//                            .useCurrentSync()
-                            .addProperty( "publicsafety.personnelid")
-                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
-                            .addProperty( "publicsafety.officerbadgeid", "BadgeNumber" )
-                            .addProperty( "vehicle.licensenumber", "DL_No" )
-                            .addProperty( "person.stateidstate", "DL_State" )
-                       .endEntity()
-                       .addEntity( "Addressperson" )
-                            .to("IowaCityAddresses")
-//                            .useCurrentSync()
-                            .addProperty("location.Address")
-                                .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
-                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" ) + " "
-                                        + row.getAs( "OZip" )  + " " + getIntersection( row.getAs( "OAddress" ) )) )
-                                .ok()
-                            .addProperty("location.street")
-                                .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
-                            .addProperty("location.intersection")
-                                .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
-                            .addProperty("location.apartment", "OAddress_Apt")
-                            .addProperty("location.city")
-                                .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
-                            .addProperty("location.state", "OState")
-                            .addProperty("location.zip", "OZip")
-                        .endEntity()
-                        .addEntity("ContactPerson1")
-                            .to("IowaCityCFSContactInfo")
-//                            .useCurrentSync()
-                            .addProperty( "contact.id", "ID" )
-                            .addProperty( "contact.phonenumber", "OPhone" )
-                        .endEntity()
-                        .addEntity("ContactPerson2")
-                            .to("IowaCityCFSContactInfo")
-//                            .useCurrentSync()
-                            .addProperty( "contact.id", "ID" )
-                            .addProperty( "contact.phonenumber", "CellPhone" )
-                            .endEntity()
-                        .addEntity("CallForServiceperson")
-                            .to("IowaCityCallForService")
-//                            .useCurrentSync()
-                            .addProperty("publicsafety.dispatchid", "Dis_ID")
-                            .addProperty( "event.comments", "OSQ" )
-                        .endEntity()
-
-                    .endEntities()
-                    .createAssociations()
-
-                        .addAssociation("AppearsInperson")
-                            .ofType("general.appearsin")
-                            .to("IowaCityCFSAppearsIn")
-//                            .useCurrentSync()
-                            .entityIdGenerator( row -> row.get("Dis_ID") + getDispatchPersonID((Row) row)  )
-                            .fromEntity("Personperson")
-                            .toEntity("CallForServiceperson")
-                           // .addProperty("general.datetime").value( row -> dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ).ok() //this field not in this table
-                                //.value( row -> caseIdToTime.get( row.getAs( "Dis_ID" ) ) ).ok()
-                            .addProperty( "general.stringid", "Dis_ID" )
-                            .addProperty( "nc.SubjectIdentification")
-                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
-                            .addProperty( "person.juvenile").value( row -> parseBool( row.getAs( "Juv" ) ) ).ok()
-                            .addProperty( "person.age")
-                                .value( row -> Parsers.parseInt( row.getAs( "Age" ) ) ).ok()
-                                //.value( row -> getIntFromDouble( row.getAs( "Age" ) ) ).ok()
-                            .addProperty( "publicsafety.dispatchpersontype", "Type" )
-                            .addProperty( "publicsafety.dispatchpersontypedescription" ).value( Dispatch::getType ).ok()
-                        .endAssociation()
-                        .addAssociation("contactedatPerson1")
-                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
-//                            .useCurrentSync()
-                            .fromEntity("Personperson")
-                            .toEntity("ContactPerson1")
-                            .addProperty( "general.stringid", "Dis_ID")
-                        .endAssociation()
-                        .addAssociation("contactedatPerson2")
-                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
-//                            .useCurrentSync()
-                            .fromEntity("Personperson")
-                            .toEntity("ContactPerson2")
-                            .addProperty( "general.stringid", "Dis_ID")
-                            .addProperty( "contact.cellphone" ).value(Dispatch::isCellphone).ok()
-                        .endAssociation()
-                        .addAssociation("AppearsInperson2")
-                            .ofType("general.appearsin").to("IowaCityAppearsIn_address")
-//                            .useCurrentSync()
-                            .fromEntity("Addressperson")
-                            .toEntity("CallForServiceperson")
-                            .addProperty( "general.stringid" , "ID")
-                            .addProperty( "location.address" ).value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
-                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
-                                        + " " + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) )) )
-                                .ok()
-                        .endAssociation()
-                        .addAssociation( "Isperson" )
-                           .ofType( "ol.is" ).to("IowaCityIsCJemployee")
-//                           .useCurrentSync()
-                           .fromEntity( "Personperson" )
-                           .toEntity( "Personnelperson" )
-                           .addProperty( "general.stringid" )
-                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
-                        .endAssociation()
-                    .endAssociations()
-                .done();
-
-
-        Flight vehiclePeepsMapping = Flight        //entitites = CFS origin, person, originating address, contact info, vehicle.  Associations = originating at, involved in (vehicle info), appears in (personnel in CFS)
-                .newFlight()
+         //filtered flight #1 of 6
+        Flight officersVehicleMapping = Flight        //entitites = CFS origin, person, originating address, contact info, vehicle.  Associations = originating at, involved in (vehicle info), appears in (personnel in CFS)
+                .newFlight("officersVehicleMapping")
                 .createEntities()
                 .addEntity( "PersonvehicleP" )
-                    .to( "IowaCityPeople" )
+                    .to( "IowaCityPeople1" )
 //                    .useCurrentSync()
                     .addProperty( "nc.SubjectIdentification" )
-                        .value( Dispatch::getDispatchPersonID )
+                        .value( Dispatch:: getDispatchPersonID)
                         .ok()        //use OfficerID if present (consistent for officers), if not use ID.
                     .addProperty( "nc.PersonGivenName" )
                         .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
@@ -596,29 +461,32 @@ public class Dispatch {
                     .addProperty( "im.PersonNickName" )
                     .value( row -> getName( row.getAs( "OName" ) ) ).ok()
                     .addProperty( "nc.PersonBirthDate" )
-                    .value( row -> dateHelper0.parseLocalDate( row.getAs( "DOB" ) ) ).ok()
+                      .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
                     .addProperty( "nc.SSN", "SSN" )
-                    .addProperty( "nc.PersonSex", "OSex" )
-                    .addProperty( "nc.PersonRace", "ORace" )
-                    .addProperty( "nc.PersonEthnicity", "Ethnicity" )
-                    .addProperty( "nc.PersonEyeColorText", "Eyes" )
-                    .addProperty( "nc.PersonHairColorText", "Hair" )
-                    .addProperty( "nc.PersonHeightMeasure" )
-                    //.value( row -> getHeightInch( row.getAs( "Height" ) ) ).ok()
-                    .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
-                    .addProperty( "nc.PersonWeightMeasure" )
-                    .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
+                    .addProperty( "nc.PersonSex")
+                        .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
+
+                    .addProperty( "nc.PersonRace")
+                        .value( row -> standardRace( row.getAs( "ORace" ) ) ).ok()
+                    .addProperty( "nc.PersonEthnicity")
+                        .value( Dispatch::standardEthnicity ).ok()
                     .addProperty( "person.stateidnumber", "MNI_No" )
                 .endEntity()
                 .addEntity( "PersonnelvehicleP" )
-                    .to( "IowaCityJusticeInvolvedPersonnel" )
+                    .to( "IowaCityJIPersonnel" )
 //                    .useCurrentSync()
                     .addProperty( "publicsafety.personnelid" )
-                    .value( Dispatch::getDispatchPersonID )
-                    .ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                        .value( Dispatch::getDispatchPersonID )
+                        .ok()        //use OfficerID if present (consistent for officers), if not use ID.
                     .addProperty( "publicsafety.officerbadgeid", "BadgeNumber" )
                     .addProperty( "vehicle.licensenumber", "DL_No" )
                     .addProperty( "person.stateidstate", "DL_State" )
+                    .addProperty( "nc.PersonEyeColorText", "Eyes" )
+                    .addProperty( "nc.PersonHairColorText", "Hair" )
+                    .addProperty( "nc.PersonHeightMeasure" )
+                        .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
+                    .addProperty( "nc.PersonWeightMeasure" )
+                        .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
                 .endEntity()
                 .addEntity( "AddressvehicleP" )
                     .to( "IowaCityAddresses" )
@@ -699,9 +567,6 @@ public class Dispatch {
                     .entityIdGenerator( row -> row.get( "Dis_ID" ) + row.get( "ID" ) )
                     .fromEntity( "PersonvehicleP" )
                     .toEntity( "CallForServicevehicleP" )
-                    //.addProperty( "general.datetime" ).value( row -> dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) )   //this field not in this table
-                    //.ok()
-                    //.value( row -> caseIdToTime.get( row.getAs( "Dis_ID" ) ) ).ok()
                     .addProperty( "general.stringid", "Dis_ID" )
                     .addProperty( "nc.SubjectIdentification" )
                         .value( Dispatch::getDispatchPersonID )
@@ -741,7 +606,7 @@ public class Dispatch {
                     .ok()
                 .endAssociation()
                 .addAssociation( "IsvehicleP" )
-                    .ofType( "ol.is" ).to( "IowaCityIsCJemployee" )
+                    .ofType( "ol.is" ).to( "IowaCityIs" )
 //                    .useCurrentSync()
                     .fromEntity( "PersonvehicleP" )
                     .toEntity( "PersonnelvehicleP" )
@@ -749,63 +614,228 @@ public class Dispatch {
                     .value( Dispatch::getDispatchPersonID )
                     .ok()        //use OfficerID if present (consistent for officers), if not use ID.
                 .endAssociation()
-//                .addAssociation( "associatedwithvehicleP" )
-//                    .ofType( "ol.associatedwith" ).to( "IowaCityAssociatedWith" )
-//                    .fromEntity( "PersonvehicleP" )
-//                    .toEntity( "VehicleP" )
-//                    .addProperty( "vehicle.licensenumber", "DL_No" )
-//                    .addProperty( "person.stateidstate", "DL_State" )
-//                    .addProperty( "general.stringid")
-//                        .value( row -> {
-//                        return getAsString( row.getAs( "MAKE" ) ) + getAsString( row.getAs( "MODEL" ) )
-//                                + getAsString( row.getAs( "LIC" ) ) + getAsString( row.getAs( "LIS" ) + getDispatchPersonID (row) );
-//                    } ).ok()
-//                .endAssociation()
                 .endAssociations()
                 .done();
 
-        Flight vehicleNoPeepsMapping = Flight        //entitites = CFS origin, person, originating address, contact info, vehicle.  Associations = originating at, involved in (vehicle info), appears in (personnel in CFS)
-                .newFlight()
-                .createEntities()
 
-                .addEntity( "AddressvehicleNP" )
+        Flight officersNoVehicleMapping = Flight         //filtered flight #2 of 6
+                .newFlight("officersNoVehicleMapping")
+                    .createEntities()
+                       .addEntity( "Personperson" )
+                             .to( "IowaCityPeople1" )
+//                             .useCurrentSync()
+                             .addProperty( "nc.SubjectIdentification")
+                                .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                             .addProperty( "nc.PersonGivenName" )
+                                .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
+                             .addProperty( "nc.PersonMiddleName" )
+                                .value( row -> getMiddleName( row.getAs( "OName" ) ) ).ok()
+                             .addProperty( "nc.PersonSurName" )
+                                .value( row -> getLastName( row.getAs( "OName" ) ) ).ok()
+                            .addProperty( "im.PersonNickName" )
+                                .value( row -> getName( row.getAs( "OName" ) ) ).ok()
+                            .addProperty( "nc.PersonBirthDate" )
+                                .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                            .addProperty( "nc.SSN", "SSN" )
+                            .addProperty( "nc.PersonSex")
+                                .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
+                            .addProperty( "nc.PersonRace")
+                                .value( row -> standardRace( row.getAs( "ORace" ) ) ).ok()
+                            .addProperty( "nc.PersonEthnicity")
+                                .value( Dispatch::standardEthnicity ).ok()
+                            .addProperty( "person.stateidnumber", "MNI_No" )
+                       .endEntity()
+                       .addEntity( "Personnelperson" )
+                            .to( "IowaCityJIPersonnel" )
+//                            .useCurrentSync()
+                            .addProperty( "publicsafety.personnelid")
+                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                            .addProperty( "publicsafety.officerbadgeid", "BadgeNumber" )
+                            .addProperty( "vehicle.licensenumber", "DL_No" )
+                            .addProperty( "person.stateidstate", "DL_State" )
+                            .addProperty( "nc.PersonEyeColorText", "Eyes" )
+                            .addProperty( "nc.PersonHairColorText", "Hair" )
+                            .addProperty( "nc.PersonHeightMeasure" )
+                                .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
+                            .addProperty( "nc.PersonWeightMeasure" )
+                                .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
+                       .endEntity()
+                       .addEntity( "Addressperson" )
+                            .to("IowaCityAddresses")
+//                            .useCurrentSync()
+                            .addProperty("location.Address")
+                                .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
+                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" ) + " "
+                                        + row.getAs( "OZip" )  + " " + getIntersection( row.getAs( "OAddress" ) )) )
+                                .ok()
+                            .addProperty("location.street")
+                                .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
+                            .addProperty("location.intersection")
+                                .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
+                            .addProperty("location.apartment", "OAddress_Apt")
+                            .addProperty("location.city")
+                                .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
+                            .addProperty("location.state", "OState")
+                            .addProperty("location.zip", "OZip")
+                        .endEntity()
+                        .addEntity("ContactPerson1")
+                            .to("IowaCityCFSContactInfo")
+//                            .useCurrentSync()
+                            .addProperty( "contact.id", "ID" )
+                            .addProperty( "contact.phonenumber", "OPhone" )
+                        .endEntity()
+                        .addEntity("ContactPerson2")
+                            .to("IowaCityCFSContactInfo")
+//                            .useCurrentSync()
+                            .addProperty( "contact.id", "ID" )
+                            .addProperty( "contact.phonenumber", "CellPhone" )
+                            .endEntity()
+                        .addEntity("CallForServiceperson")
+                            .to("IowaCityCallForService")
+//                            .useCurrentSync()
+                            .addProperty("publicsafety.dispatchid", "Dis_ID")
+                            .addProperty( "event.comments", "OSQ" )
+                        .endEntity()
+
+                    .endEntities()
+                    .createAssociations()
+
+                        .addAssociation("AppearsInperson")
+                            .ofType("general.appearsin")
+                            .to("IowaCityCFSAppearsIn")
+//                            .useCurrentSync()
+                            .entityIdGenerator( row -> row.get("Dis_ID") + row.get( "OfficerID" ) )
+                            .fromEntity("Personperson")
+                            .toEntity("CallForServiceperson")
+                           // .addProperty("general.datetime").value( row -> dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ).ok() //this field not in this table
+                                //.value( row -> caseIdToTime.get( row.getAs( "Dis_ID" ) ) ).ok()
+                            .addProperty( "general.stringid", "Dis_ID" )
+                            .addProperty( "nc.SubjectIdentification")
+                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                            .addProperty( "person.juvenile").value( row -> parseBool( row.getAs( "Juv" ) ) ).ok()
+                            .addProperty( "person.age")
+                                .value( row -> Parsers.parseInt( row.getAs( "Age" ) ) ).ok()
+                                //.value( row -> getIntFromDouble( row.getAs( "Age" ) ) ).ok()
+                            .addProperty( "publicsafety.dispatchpersontype", "Type" )
+                            .addProperty( "publicsafety.dispatchpersontypedescription" ).value( Dispatch::getType ).ok()
+                        .endAssociation()
+                        .addAssociation("contactedatPerson1")
+                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
+//                            .useCurrentSync()
+                            .fromEntity("Personperson")
+                            .toEntity("ContactPerson1")
+                            .addProperty( "general.stringid", "Dis_ID")
+                        .endAssociation()
+                        .addAssociation("contactedatPerson2")
+                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
+//                            .useCurrentSync()
+                            .fromEntity("Personperson")
+                            .toEntity("ContactPerson2")
+                            .addProperty( "general.stringid", "Dis_ID")
+                            .addProperty( "contact.cellphone" ).value(Dispatch::isCellphone).ok()
+                        .endAssociation()
+                        .addAssociation("AppearsInperson2")
+                            .ofType("general.appearsin").to("IowaCityAppearsIn_address")
+//                            .useCurrentSync()
+                            .fromEntity("Addressperson")
+                            .toEntity("CallForServiceperson")
+                            .addProperty( "general.stringid" , "ID")
+                            .addProperty( "location.address" ).value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
+                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
+                                        + " " + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) )) )
+                                .ok()
+                        .endAssociation()
+                        .addAssociation( "Isperson" )
+                           .ofType( "ol.is" ).to("IowaCityIs")
+//                           .useCurrentSync()
+                           .fromEntity( "Personperson" )
+                           .toEntity( "Personnelperson" )
+                           .addProperty( "general.stringid" )
+                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                        .endAssociation()
+                    .endAssociations()
+                .done();
+
+
+         Flight othersVehicleMapping = Flight        //filtered flight #3 of 6
+                .newFlight("othersVehicleMapping")
+                .createEntities()
+                .addEntity( "Person2OV" )       //justice-involved people, NOT officers.
+                    .to( "IowaCityPeople2" )
+//                    .useCurrentSync()
+                    .addProperty( "nc.SubjectIdentification" )
+                        .value( Dispatch:: getDispatchPersonID)
+                        .ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                    .addProperty( "nc.PersonGivenName" )
+                        .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
+                    .addProperty( "nc.PersonMiddleName" )
+                        .value( row -> getMiddleName( row.getAs( "OName" ) ) ).ok()
+                    .addProperty( "nc.PersonSurName" )
+                        .value( row -> getLastName( row.getAs( "OName" ) ) ).ok()
+                    .addProperty( "im.PersonNickName" )
+                    .value( row -> getName( row.getAs( "OName" ) ) ).ok()
+                    .addProperty( "nc.PersonBirthDate" )
+                      .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                    .addProperty( "nc.SSN", "SSN" )
+                    .addProperty( "nc.PersonSex")
+                        .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
+                    .addProperty( "nc.PersonRace")
+                        .value( row -> standardRace( row.getAs( "ORace" ) ) ).ok()
+                    .addProperty( "nc.PersonEthnicity")
+                        .value( Dispatch::standardEthnicity ).ok()
+                    .addProperty( "person.stateidnumber", "MNI_No" )
+                .endEntity()
+                .addEntity( "JIPeopleOV" )
+                    .to( "IowaCityJIPeople" )
+//                    .useCurrentSync()
+                    .addProperty( "criminaljustice.personid", "ID" )
+                    .addProperty( "vehicle.licensenumber", "DL_No" )
+                    .addProperty( "person.stateidstate", "DL_State" )
+                    .addProperty( "nc.PersonEyeColorText", "Eyes" )
+                    .addProperty( "nc.PersonHairColorText", "Hair" )
+                    .addProperty( "nc.PersonHeightMeasure" )
+                        .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
+                    .addProperty( "nc.PersonWeightMeasure" )
+                        .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
+                .endEntity()
+                .addEntity( "AddressOV" )
                     .to( "IowaCityAddresses" )
 //                    .useCurrentSync()
                     .addProperty( "location.Address" )
-                    .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
-                            + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
-                            + " "
-                            + row.getAs( "OZip" ) + getIntersection( row.getAs( "OAddress" ) ) ) )
-                    .ok()
+                        .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
+                                + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
+                                + " "
+                                + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) ) ) )
+                        .ok()
                     .addProperty( "location.street" )
-                    .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
+                        .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
                     .addProperty( "location.intersection" )
-                    .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
+                        .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
                     .addProperty( "location.apartment", "OAddress_Apt" )
                     .addProperty( "location.city" )
-                    .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
+                        .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
                     .addProperty( "location.state", "OState" )
                     .addProperty( "location.zip", "OZip" )
                 .endEntity()
-                .addEntity( "ContactvehicleNP1" )
+                .addEntity( "ContactOV1" )
                     .to( "IowaCityCFSContactInfo" )
 //                    .useCurrentSync()
                     .addProperty( "contact.id", "ID" )
                     .addProperty( "contact.phonenumber", "OPhone" )
                 .endEntity()
-                .addEntity( "ContactvehicleNP2" )
+                .addEntity( "ContactOV2" )
                     .to( "IowaCityCFSContactInfo" )
 //                    .useCurrentSync()
                     .addProperty( "contact.id", "ID" )
                     .addProperty( "contact.phonenumber", "CellPhone" )
                 .endEntity()
-                .addEntity( "CallForServicevehicleNP" )
+                .addEntity( "CallForServiceOV" )
                     .to( "IowaCityCallForService" )
-    //                .useCurrentSync()
+//                    .useCurrentSync()
                     .addProperty( "publicsafety.dispatchid", "Dis_ID" )
                     .addProperty( "event.comments", "OSQ" )
                 .endEntity()
-                .addEntity( "VehicleNP" )
+                .addEntity( "VehicleOV" )
                     .to( "IowaCityVehicle" )
 //                    .useCurrentSync()
                     .addProperty( "vehicle.id" )
@@ -832,19 +862,52 @@ public class Dispatch {
                 .endEntities()
 
                 .createAssociations()
-                .addAssociation( "InvolvedInvehicleNP" )
+                .addAssociation( "InvolvedInOV" )
                     .ofType( "publicsafety.involvedin" )
                     .to( "IowaCityCFSInvolvedIn" )
 //                    .useCurrentSync()
-                    .fromEntity( "VehicleNP" )
-                    .toEntity( "CallForServicevehicleNP" )
+                    .fromEntity( "VehicleOV" )
+                    .toEntity( "CallForServiceOV" )
                     .addProperty( "publicsafety.dispatchid", "Dis_ID" )
                 .endAssociation()
-                .addAssociation( "AppearsInvehicleNP" )
+                .addAssociation( "AppearsInOV" )
+                    .ofType( "general.appearsin" )
+                    .to( "IowaCityCFSAppearsIn" )
+//                    .useCurrentSync()
+                    .entityIdGenerator( row -> row.get( "Dis_ID" ) + row.get( "ID" ) )
+                    .fromEntity( "Person2OV" )
+                    .toEntity( "CallForServiceOV" )
+                    .addProperty( "general.stringid", "Dis_ID" )
+                    .addProperty( "nc.SubjectIdentification" )
+                        .value( Dispatch::getDispatchPersonID )
+                        .ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                    .addProperty( "person.juvenile" ).value( row -> parseBool( row.getAs( "Juv" ) ) ).ok()
+                    .addProperty( "person.age" )
+                        .value( row -> Parsers.parseInt( row.getAs( "Age" ) ) ).ok()
+                    //.value( row -> getIntFromDouble( row.getAs( "Age" ) ) ).ok()
+                    .addProperty( "publicsafety.dispatchpersontype", "Type" )
+                    .addProperty( "publicsafety.dispatchpersontypedescription" ).value( Dispatch::getType ).ok()
+                .endAssociation()
+                .addAssociation( "contactedatOV1" )
+                    .ofType( "geo.contactedat" ).to( "IowaCityCFSContactedAt" )
+//                    .useCurrentSync()
+                    .fromEntity( "Person2OV" )
+                    .toEntity( "ContactOV1" )
+                    .addProperty( "general.stringid", "Dis_ID" )
+                .endAssociation()
+                .addAssociation( "contactedatvehicleP2" )
+                    .ofType( "geo.contactedat" ).to( "IowaCityCFSContactedAt" )
+//                    .useCurrentSync()
+                    .fromEntity( "Person2OV" )
+                    .toEntity( "ContactOV2" )
+                    .addProperty( "general.stringid", "Dis_ID" )
+                    .addProperty( "contact.cellphone" ).value( Dispatch::isCellphone ).ok()
+                .endAssociation()
+                .addAssociation( "AppearsInvehicle2P" )
                     .ofType( "general.appearsin" ).to( "IowaCityAppearsIn_address" )
 //                    .useCurrentSync()
-                    .fromEntity( "AddressvehicleNP" )
-                    .toEntity( "CallForServicevehicleNP" )
+                    .fromEntity( "AddressOV" )
+                    .toEntity( "CallForServiceOV" )
                     .addProperty( "general.stringid", "ID" )
                     .addProperty( "location.address" )
                     .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
@@ -852,15 +915,253 @@ public class Dispatch {
                             + " " + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) ) ) )
                     .ok()
                 .endAssociation()
+                .addAssociation( "IsOV" )
+                    .ofType( "ol.is" ).to( "IowaCityIs" )
+//                    .useCurrentSync()
+                    .fromEntity( "Person2OV" )
+                    .toEntity( "JIPeopleOV" )
+                    .addProperty( "general.stringid" )
+                    .value( Dispatch::getDispatchPersonID )
+                    .ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                .endAssociation()
+                .endAssociations()
+                .done();
+
+
+                Flight othersNoVehicleMapping = Flight         //filtered flight #4 of 6
+                .newFlight("othersNoVehicleMapping")
+                    .createEntities()
+                       .addEntity( "Person2ONV" )
+                             .to( "IowaCityPeople2" )
+//                             .useCurrentSync()
+                             .addProperty( "nc.SubjectIdentification")
+                                .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                             .addProperty( "nc.PersonGivenName" )
+                                .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
+                             .addProperty( "nc.PersonMiddleName" )
+                                .value( row -> getMiddleName( row.getAs( "OName" ) ) ).ok()
+                             .addProperty( "nc.PersonSurName" )
+                                .value( row -> getLastName( row.getAs( "OName" ) ) ).ok()
+                            .addProperty( "im.PersonNickName" )
+                                .value( row -> getName( row.getAs( "OName" ) ) ).ok()
+                            .addProperty( "nc.PersonBirthDate" )
+                                .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                            .addProperty( "nc.SSN", "SSN" )
+                            .addProperty( "nc.PersonSex")
+                                .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
+                            .addProperty( "nc.PersonRace")
+                                .value( row -> standardRace( row.getAs( "ORace" ) ) ).ok()
+                            .addProperty( "nc.PersonEthnicity")
+                                .value( Dispatch::standardEthnicity ).ok()
+                            .addProperty( "person.stateidnumber", "MNI_No" )
+                       .endEntity()
+                       .addEntity( "JIPeopleONV" )
+                            .to( "IowaCityJIPeople" )
+//                            .useCurrentSync()
+                            .addProperty( "criminaljustice.personid", "ID")
+                            .addProperty( "vehicle.licensenumber", "DL_No" )
+                            .addProperty( "person.stateidstate", "DL_State" )
+                            .addProperty( "nc.PersonEyeColorText", "Eyes" )
+                            .addProperty( "nc.PersonHairColorText", "Hair" )
+                            .addProperty( "nc.PersonHeightMeasure" )
+                                .value( row -> Parsers.parseInt( row.getAs( "Height" ) ) ).ok()
+                            .addProperty( "nc.PersonWeightMeasure" )
+                                .value( row -> Parsers.parseInt( row.getAs( "Weight" ) ) ).ok()
+                       .endEntity()
+                       .addEntity( "AddressONV" )
+                            .to("IowaCityAddresses")
+//                            .useCurrentSync()
+                            .addProperty("location.Address")
+                                .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
+                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" ) + " "
+                                        + row.getAs( "OZip" )  + " " + getIntersection( row.getAs( "OAddress" ) )) )
+                                .ok()
+                            .addProperty("location.street")
+                                .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
+                            .addProperty("location.intersection")
+                                .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
+                            .addProperty("location.apartment", "OAddress_Apt")
+                            .addProperty("location.city")
+                                .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
+                            .addProperty("location.state", "OState")
+                            .addProperty("location.zip", "OZip")
+                        .endEntity()
+                        .addEntity("Contact1ONV")
+                            .to("IowaCityCFSContactInfo")
+//                            .useCurrentSync()
+                            .addProperty( "contact.id", "ID" )
+                            .addProperty( "contact.phonenumber", "OPhone" )
+                        .endEntity()
+                        .addEntity("Contact2ONV")
+                            .to("IowaCityCFSContactInfo")
+//                            .useCurrentSync()
+                            .addProperty( "contact.id", "ID" )
+                            .addProperty( "contact.phonenumber", "CellPhone" )
+                            .endEntity()
+                        .addEntity("CallForServiceONV")
+                            .to("IowaCityCallForService")
+//                            .useCurrentSync()
+                            .addProperty("publicsafety.dispatchid", "Dis_ID")
+                            .addProperty( "event.comments", "OSQ" )
+                        .endEntity()
+
+                    .endEntities()
+                    .createAssociations()
+
+                        .addAssociation("AppearsInONV")
+                            .ofType("general.appearsin")
+                            .to("IowaCityCFSAppearsIn")
+//                            .useCurrentSync()
+                            .entityIdGenerator( row -> row.get("Dis_ID") + row.get( "OfficerID" )  )
+                            .fromEntity("Person2ONV")
+                            .toEntity("CallForServiceONV")
+                           // .addProperty("general.datetime").value( row -> dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ).ok() //this field not in this table
+                                //.value( row -> caseIdToTime.get( row.getAs( "Dis_ID" ) ) ).ok()
+                            .addProperty( "general.stringid", "Dis_ID" )
+                            .addProperty( "nc.SubjectIdentification")
+                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                            .addProperty( "person.juvenile").value( row -> parseBool( row.getAs( "Juv" ) ) ).ok()
+                            .addProperty( "person.age")
+                                .value( row -> Parsers.parseInt( row.getAs( "Age" ) ) ).ok()
+                                //.value( row -> getIntFromDouble( row.getAs( "Age" ) ) ).ok()
+                            .addProperty( "publicsafety.dispatchpersontype", "Type" )
+                            .addProperty( "publicsafety.dispatchpersontypedescription" ).value( Dispatch::getType ).ok()
+                        .endAssociation()
+                        .addAssociation("contactedat1ONV")
+                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
+//                            .useCurrentSync()
+                            .fromEntity("Person2ONV")
+                            .toEntity("Contact1ONV")
+                            .addProperty( "general.stringid", "Dis_ID")
+                        .endAssociation()
+                        .addAssociation("contactedat2ONV")
+                            .ofType("geo.contactedat").to("IowaCityCFSContactedAt")
+//                            .useCurrentSync()
+                            .fromEntity("Person2ONV")
+                            .toEntity("Contact2ONV")
+                            .addProperty( "general.stringid", "Dis_ID")
+                            .addProperty( "contact.cellphone" ).value(Dispatch::isCellphone).ok()
+                        .endAssociation()
+                        .addAssociation("AppearsIn2ONV")
+                            .ofType("general.appearsin").to("IowaCityAppearsIn_address")
+//                            .useCurrentSync()
+                            .fromEntity("AddressONV")
+                            .toEntity("CallForServiceONV")
+                            .addProperty( "general.stringid" , "ID")
+                            .addProperty( "location.address" ).value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
+                                        + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
+                                        + " " + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) )) )
+                                .ok()
+                        .endAssociation()
+                        .addAssociation( "Isperson" )
+                           .ofType( "ol.is" ).to("IowaCityIs")
+//                           .useCurrentSync()
+                           .fromEntity( "Person2ONV" )
+                           .toEntity( "JIPeopleONV" )
+                           .addProperty( "general.stringid" )
+                                 .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
+                        .endAssociation()
+                    .endAssociations()
+                .done();
+
+
+        Flight noPeopleVehicleMapping = Flight        //filtered flight #5 of 6
+                .newFlight("noPeopleVehicleMapping")
+                .createEntities()
+
+                .addEntity( "AddressNPV" )
+                    .to( "IowaCityAddresses" )
+//                    .useCurrentSync()
+                    .addProperty( "location.Address" )
+                        .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + " " + row.getAs( "OAddress_Apt" )
+                                + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
+                                + " "
+                                + row.getAs( "OZip" ) + getIntersection( row.getAs( "OAddress" ) ) ) )
+                        .ok()
+                    .addProperty( "location.street" )
+                        .value( row -> getStreet( row.getAs( "OAddress" ) ) ).ok()
+                    .addProperty( "location.intersection" )
+                        .value( row -> getIntersection( row.getAs( "OAddress" ) ) ).ok()
+                    .addProperty( "location.apartment", "OAddress_Apt" )
+                    .addProperty( "location.city" )
+                        .value( row -> addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) ).ok()
+                    .addProperty( "location.state", "OState" )
+                    .addProperty( "location.zip", "OZip" )
+                .endEntity()
+                .addEntity( "Contact1NPV" )
+                    .to( "IowaCityCFSContactInfo" )
+//                    .useCurrentSync()
+                    .addProperty( "contact.id", "ID" )
+                    .addProperty( "contact.phonenumber", "OPhone" )
+                .endEntity()
+                .addEntity( "Contact2NPV" )
+                    .to( "IowaCityCFSContactInfo" )
+//                    .useCurrentSync()
+                    .addProperty( "contact.id", "ID" )
+                    .addProperty( "contact.phonenumber", "CellPhone" )
+                .endEntity()
+                .addEntity( "CallForServiceNPV" )
+                    .to( "IowaCityCallForService" )
+    //                .useCurrentSync()
+                    .addProperty( "publicsafety.dispatchid", "Dis_ID" )
+                    .addProperty( "event.comments", "OSQ" )
+                .endEntity()
+                .addEntity( "VehicleNPV" )
+                    .to( "IowaCityVehicle" )
+//                    .useCurrentSync()
+                    .addProperty( "vehicle.id" )
+                        .value( row -> {
+                            return getAsString( row.getAs( "MAKE" ) ) + getAsString( row.getAs( "MODEL" ) )
+                                    + getAsString( row.getAs( "LIC" ) ) + getAsString( row.getAs( "LIS" ) );
+                        } ).ok()
+                    .addProperty( "vehicle.make", "MAKE" )
+                    .addProperty( "vehicle.model", "MODEL" )
+                    .addProperty( "vehicle.licensenumber", "LIC" )
+                    .addProperty( "vehicle.licensestate", "LIS" )
+                    .addProperty( "vehicle.vin", "VIN" )
+                    .addProperty( "vehicle.year" )
+                        .value( row -> getStrYear( row.getAs( "VehYear" ) ) ).ok()
+                    .addProperty( "vehicle.color", "Color" )
+                    .addProperty( "vehicle.secondarycolor", "ColorSecondary" )
+                    .addProperty( "vehicle.style", "Style" )
+                    .addProperty( "vehicle.licenseplatetype", "LIT" )
+                    .addProperty( "vehicle.licenseyear" )
+                        .value( row -> getStrYear( row.getAs( "LIY" ) ) ).ok()
+                    .addProperty( "publicsafety.dispatchtransfervehicle" ).value( row -> parseBool( row.getAs( "TransferVehicle" ) ) )
+                        .ok()
+                .endEntity()
+                .endEntities()
+
+                .createAssociations()
+                .addAssociation( "InvolvedInNPV" )
+                    .ofType( "publicsafety.involvedin" )
+                    .to( "IowaCityCFSInvolvedIn" )
+//                    .useCurrentSync()
+                    .fromEntity( "VehicleNPV" )
+                    .toEntity( "CallForServiceNPV" )
+                    .addProperty( "publicsafety.dispatchid", "Dis_ID" )
+                .endAssociation()
+                .addAssociation( "AppearsInNPV" )
+                    .ofType( "general.appearsin" ).to( "IowaCityAppearsIn_address" )
+//                    .useCurrentSync()
+                    .fromEntity( "AddressNPV" )
+                    .toEntity( "CallForServiceNPV" )
+                    .addProperty( "general.stringid", "ID" )
+                    .addProperty( "location.address" )
+                        .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
+                                + ", " + addSpaceAfterCommaUpperCase( row.getAs( "OCity" ) ) + ", " + row.getAs( "OState" )
+                                + " " + row.getAs( "OZip" ) + " " + getIntersection( row.getAs( "OAddress" ) ) ) )
+                        .ok()
+                .endAssociation()
 
                 .endAssociations()
                 .done();
 
-        Flight noVehicleNoPeepsMapping = Flight        //entitites = CFS origin, person, originating address, contact info, vehicle.  Associations = originating at, involved in (vehicle info), appears in (personnel in CFS)
-                .newFlight()
+        Flight noPeoplenoVehicleMapping = Flight        //filtered flight #6 of 6
+                .newFlight("noPeoplenoVehicleMapping")
                 .createEntities()
 
-                .addEntity( "AddressNVNP" )
+                .addEntity( "AddressNPNV" )
                     .to( "IowaCityAddresses" )
 //                    .useCurrentSync()
                     .addProperty( "location.Address" )
@@ -879,19 +1180,19 @@ public class Dispatch {
                     .addProperty( "location.state", "OState" )
                     .addProperty( "location.zip", "OZip" )
                 .endEntity()
-                .addEntity( "ContactNVNP1" )
+                .addEntity( "ContactNPNV1" )
                     .to( "IowaCityCFSContactInfo" )
 //                    .useCurrentSync()
                     .addProperty( "contact.id", "ID" )
                     .addProperty( "contact.phonenumber", "OPhone" )
                 .endEntity()
-                .addEntity( "ContactNVNP2" )
+                .addEntity( "ContactNPNV2" )
                     .to( "IowaCityCFSContactInfo" )
     //                .useCurrentSync()
                     .addProperty( "contact.id", "ID" )
                     .addProperty( "contact.phonenumber", "CellPhone" )
                 .endEntity()
-                .addEntity( "CallForServiceNVNP" )
+                .addEntity( "CallForServiceNPNV" )
                     .to( "IowaCityCallForService" )
     //                .useCurrentSync()
                     .addProperty( "publicsafety.dispatchid", "Dis_ID" )
@@ -901,11 +1202,11 @@ public class Dispatch {
                 .endEntities()
                 .createAssociations()
 
-                .addAssociation( "AppearsInNVNP" )
+                .addAssociation( "AppearsInNPNV" )
                     .ofType( "general.appearsin" ).to( "IowaCityAppearsIn_address" )
 //                    .useCurrentSync()
-                    .fromEntity( "AddressNVNP" )
-                    .toEntity( "CallForServiceNVNP" )
+                    .fromEntity( "AddressNPNV" )
+                    .toEntity( "CallForServiceNPNV" )
                     .addProperty( "general.stringid", "ID" )
                     .addProperty( "location.address" )
                     .value( row -> getAddressID( getStreet( row.getAs( "OAddress" ) ) + "," + row.getAs( "OAddress_Apt" )
@@ -919,14 +1220,16 @@ public class Dispatch {
 
         Shuttle shuttle = new Shuttle( environment, jwtToken );
         Map<Flight, Payload> flights = new HashMap<>();
-            flights.put( sysuserbaseMapping, sysuserbasePayload );
-            flights.put( dispatchMapping, dispatchPayload );
-            flights.put( nonUnitMapping, nonUnitPayload );
-            flights.put( unitMapping, unitPayload );
-            flights.put( noVehiclePeepsMapping, noVehiclePeepsPayload );
-            flights.put( vehiclePeepsMapping, vehiclePeepsPayload );
-            flights.put( vehicleNoPeepsMapping, vehicleNoPeepsPayload );
-            flights.put( noVehicleNoPeepsMapping, noVehicleNoPeepsPayload );
+                flights.put( sysuserbaseMapping, sysuserbasePayload );
+                flights.put( dispatchMapping, dispatchPayload );
+                flights.put( nonUnitMapping, nonUnitPayload );
+                flights.put( unitMapping, unitPayload );
+                flights.put( officersVehicleMapping, officersVehiclePayload );
+                flights.put( officersNoVehicleMapping, officersNoVehiclePayload );
+        flights.put( othersVehicleMapping, othersVehiclePayload );
+        flights.put( othersNoVehicleMapping, othersNoVehiclePayload );
+                flights.put( noPeopleVehicleMapping, noPeopleVehiclePayload );
+                flights.put( noPeoplenoVehicleMapping, noPeoplenoVehiclePayload );
 
         shuttle.launchPayloadFlight( flights );
 
@@ -960,30 +1263,64 @@ public class Dispatch {
                 String[] strBadge = badgerow.split( " " );
                 return strBadge[ 0 ].trim();
             }
+            return null;
         }
         return null;
     }
 
-    public static boolean containsPerson( Map<String, String> row ) {
+    public static boolean containsOfficer( Map<String, String> row ) {
         String ppl = row.get( "OName" );
-        if ( ppl != null ) {                   //if OName is not null and a word matches the pattern matcher, return false (it's a unit or business)
-            Matcher m = p.matcher( ppl );
-            return false;
-        }
-        String driverslicense = row.get( "DL_No");
-        if ( driverslicense != null ) {
+        if ( ppl != null ) {
+            Matcher m = p
+                    .matcher( ppl );       //if OName is not null and a word matches the pattern matcher, return false (it's a unit or business)
+            if ( m.find() ) {
+                return false;
+            }
 
-        Matcher m = p.matcher( ppl );         //if OName IS null and a word matches the pattern matcher, return the next subsequence of the word?
-        return m.find();
+            String officer = row.get( "OfficerID" );
+            if ( StringUtils.isNotBlank( officer ) ) {
+                return true;         //OFFICERS: If a word doesn't match the pattern matcher AND there is an OfficerID, return true
+            }
+            return false;           //OFFICERS: If a word doesn't match the pattern matcher and there is NO OfficerID, return false
         }
-    return false;
+        String driverslicense = row.get( "DL_No" );       //If OName IS null but there IS a drivers license #:
+        if ( driverslicense != null ) {
+            String officer = row.get( "OfficerID" );
+            if ( StringUtils.isNotBlank( officer ) ) {
+                return true;         //If an OfficerID, still call it an officer
+            }
+            return false;           //If no OfficerID either, return false
+        }
+        return false;
+    }
+
+    public static boolean containsOtherPerson( Map<String, String> row ) {
+        String officer = row.get( "OfficerID" );
+        if ( StringUtils.isBlank( officer ) ) {
+
+            String driverslicense = row.get( "DL_No" );
+            if ( StringUtils.isNotBlank( driverslicense ) )
+                return true;
+
+            String ppl = row.get( "OName" );
+            if ( StringUtils.isNotBlank( ppl ) ) {
+
+                Matcher m = p.matcher( ppl );
+                return !m.find();    //if not a pattern match, return true. find() returns a boolean.
+            }
+        }
+        return false;
     }
 
     public static boolean containsUnit( Map<String, String> row ) {
         String unit = row.get( "Unit" );
         if ( unit != null ) {
             Matcher m = p.matcher( unit );
-            return m.find();
+            if ( m.find() ) {
+                return true;
+            }
+            return false;
+            //            return m.find();
         }
         return false;
     }
@@ -1015,28 +1352,27 @@ public class Dispatch {
                     return unitid.toString();
                 }
             }
-                        //if 'arrived' is blank
-                        String completed = String.valueOf( timeHelper0.parseTime( row.getAs( "TimeComp" ) ) );
-                        if ( StringUtils.isNotBlank( completed ) ) {
-                            Matcher m = p.matcher( unit );
-                            if ( m.find() ) {
-                                StringBuilder unitid = new StringBuilder( unit );
-                                unitid.append( " " ).append( completed );
-                                return unitid.toString();
-                            }
-                            return null;
-                        }
+            //if 'arrived' is blank
+            String completed = String.valueOf( timeHelper0.parseTime( row.getAs( "TimeComp" ) ) );
+            if ( StringUtils.isNotBlank( completed ) ) {
+                Matcher m = p.matcher( unit );
+                if ( m.find() ) {
+                    StringBuilder unitid = new StringBuilder( unit );
+                    unitid.append( " " ).append( completed );
+                    return unitid.toString();
+                }
+                return null;
+            }
 
-                        Matcher m = p.matcher( unit );
-                        if ( m.find() ) {
-                            StringBuilder unitid = new StringBuilder( unit );
-                            return unitid.toString();
-                        }
-                        return null;
-                    }
+            Matcher m = p.matcher( unit );
+            if ( m.find() ) {
+                StringBuilder unitid = new StringBuilder( unit );
+                return unitid.toString();
+            }
+            return null;
+        }
         return null;
     }
-
 
     public static boolean containsVehicle( Map<String, String> row ) {
         String make = row.get( "MAKE" );
@@ -1054,7 +1390,7 @@ public class Dispatch {
 
     public static String getDispatchPersonID( Row row ) {
         String id = row.getAs( "OfficerID" );
-        if ( id != null ) {
+        if ( StringUtils.isNotBlank( id ) ) {
             return id;
         }
         return row.getAs( "ID" );
@@ -1152,22 +1488,6 @@ public class Dispatch {
         return null;
     }
 
-    //    public static String getZipCode( Object obj ) {
-    //        String str = Parsers.getAsString( obj );
-    //        if ( str != null ) {
-    //            String[] strDate = str.split( " " );
-    //            if ( strDate.length > 1 ) {
-    //                return getStringFromDouble( strDate[ strDate.length - 1 ]).trim();
-    //            }
-    //            String[] lZip = str.split( "-" );
-    //            if ( lZip.length > 1 ) {
-    //                return str;
-    //            }
-    //            return getStringFromDouble( strDate[ 0 ]).trim();
-    //        }
-    //        return null;
-    //    }
-
     public static String getPhoneNumber( Object obj ) {
         String str = getAsString( obj );
         if ( str != null ) {
@@ -1228,4 +1548,44 @@ public class Dispatch {
         }
         return null;
     }
+
+    public static String standardEthnicity( Row row ) {
+        String eth = row.getAs( "Ethnicity" );
+
+        if ( eth != null ) {
+            if ( eth.equals( "H" ) ) { return "hispanic"; }
+            if ( eth.equals( "N" ) ) { return "nonhispanic"; }
+            if ( eth.equals( "U" ) ) { return null; }
+            if ( eth.equals( "" ) ) { return null; }
+        }
+        return null;
+    }
+
+    public static String standardSex( Object obj ) {
+        String sex = getAsString( obj );
+
+        if ( sex != null ) {
+            if ( sex.equalsIgnoreCase( "Male" ) || sex.equalsIgnoreCase( "M" ) ) {return "M"; }
+            if ( sex.equalsIgnoreCase( "Female" ) || sex.equalsIgnoreCase( "F" ) || sex.equalsIgnoreCase( "FM" ) || sex
+                    .equalsIgnoreCase( "F`" ) ) {return "F"; }
+            if ( sex.equals( "" ) ) { return null; }
+            if ( !sex.startsWith( ( "FfMm" ) ) ) { return null; }
+        }
+        return null;
+    }
+
+    public static String standardRace( Object obj ) {
+        String sr = getAsString( obj );
+
+        if ( sr != null ) {
+            if ( sr.equalsIgnoreCase( "Asian" ) || sr.equalsIgnoreCase( "A" ) ) {return "asian"; }
+            if ( sr.equalsIgnoreCase( "W" ) || sr.equalsIgnoreCase( "White" ) ) { return "white"; }
+            if ( sr.equalsIgnoreCase( "Black" ) || sr.equalsIgnoreCase( "B" ) ) { return "black"; }
+            if ( sr.equalsIgnoreCase( "American Indian" ) || sr.equalsIgnoreCase( "I" ) || sr
+                    .equalsIgnoreCase( "Indian" ) ) { return "amindian"; }
+            if ( sr.equalsIgnoreCase( "O" ) || sr.equalsIgnoreCase( "U" ) || sr.equals( "" ) ) { return null; }
+        }
+        return null;
+    }
+
 }
