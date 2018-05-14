@@ -66,11 +66,11 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person" );        // includes vehicle info
+                "select * from dispatch_person_6months" );        // includes vehicle info
         Payload sysuserbasePayload = new JdbcPayload( hds,
                 "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
-        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch" );
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type" );
+        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch_6months" );
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type_6months" );
 
         List<Map<String, String>> fp = distypePayload.getPayload().collect( Collectors.toList() );
         Payload unitPayload = new SimplePayload( fp.stream().filter( row -> containsUnit( row ) ) );
