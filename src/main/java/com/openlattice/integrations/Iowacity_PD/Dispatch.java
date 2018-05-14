@@ -53,12 +53,12 @@ public class Dispatch {
 
     public static void main( String[] args ) throws InterruptedException, IOException {
 
-//                final String username = args[ 0 ];                                            //for running on Atlas
-//                final String password = args[ 1 ];                                            //for running on Atlas
-//                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Atlas
-//                final String integrationFile = args[ 2 ];                                     //for running on Atlas
-        final String jwtToken = args[ 0 ];              //for local testing
-        final String integrationFile = args[ 1 ];       //for local testing
+                final String username = args[ 0 ];                                            //for running on Atlas
+                final String password = args[ 1 ];                                            //for running on Atlas
+                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Atlas
+                final String integrationFile = args[ 2 ];                                     //for running on Atlas
+//        final String jwtToken = args[ 0 ];              //for local testing
+//        final String integrationFile = args[ 1 ];       //for local testing
 
         HikariDataSource hds =
                 ObjectMappers.getYamlMapper()
