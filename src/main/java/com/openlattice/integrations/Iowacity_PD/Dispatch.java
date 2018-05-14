@@ -44,7 +44,7 @@ public class Dispatch {
     private static final Logger logger = LoggerFactory
             .getLogger( Dispatch.class );
 
-    private static final Environment environment = Environment.LOCAL;
+    private static final Environment environment = Environment.PRODUCTION;
 
     private static final DateTimeHelper     dateHelper0 = new DateTimeHelper( TimeZones.America_Chicago,
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
@@ -53,12 +53,12 @@ public class Dispatch {
 
     public static void main( String[] args ) throws InterruptedException, IOException {
 
-                final String username = args[ 1 ];
-                final String password = args[ 2 ];
-                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Athena
-                final String integrationFile = args[ 3 ];                                     //for running on Athena
-//        final String jwtToken = args[ 0 ];              //for local testing
-//        final String integrationFile = args[ 1 ];       //for local testing
+//                final String username = args[ 0 ];                                            //for running on Atlas
+//                final String password = args[ 1 ];                                            //for running on Atlas
+//                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Atlas
+//                final String integrationFile = args[ 2 ];                                     //for running on Atlas
+        final String jwtToken = args[ 0 ];              //for local testing
+        final String integrationFile = args[ 1 ];       //for local testing
 
         HikariDataSource hds =
                 ObjectMappers.getYamlMapper()
@@ -66,11 +66,11 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person_15m" );        // includes vehicle info
+                "select * from dispatch_person" );        // includes vehicle info
         Payload sysuserbasePayload = new JdbcPayload( hds,
                 "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
-        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch_15m" );
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type_15m" );
+        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch" );
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type" );
 
         List<Map<String, String>> fp = distypePayload.getPayload().collect( Collectors.toList() );
         Payload unitPayload = new SimplePayload( fp.stream().filter( row -> containsUnit( row ) ) );
