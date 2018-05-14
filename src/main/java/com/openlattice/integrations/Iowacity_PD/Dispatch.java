@@ -66,11 +66,11 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person_14d" );        // includes vehicle info
+                "select * from dispatch_person limit 1000000" );        // includes vehicle info
 //        Payload sysuserbasePayload = new JdbcPayload( hds,
 //                "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
-        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch_14d" );
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type_14d" );
+        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 1000000" );
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 1000000" );
 
         List<Map<String, String>> fp = distypePayload.getPayload().collect( Collectors.toList() );
         Payload unitPayload = new SimplePayload( fp.stream().filter( row -> containsUnit( row ) ) );
