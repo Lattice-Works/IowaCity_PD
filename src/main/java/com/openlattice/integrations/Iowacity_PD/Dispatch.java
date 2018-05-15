@@ -46,8 +46,6 @@ public class Dispatch {
 
     private static final Environment environment = Environment.PRODUCTION;
 
-    private static final DateTimeHelper     dateHelper0 = new DateTimeHelper( TimeZones.America_Chicago,
-            "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
     private static final JavaDateTimeHelper timeHelper0 = new JavaDateTimeHelper( TimeZones.America_Chicago,
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
 
@@ -66,11 +64,11 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person limit 1000000" );        // includes vehicle info
-//        Payload sysuserbasePayload = new JdbcPayload( hds,
-//                "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
-        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 1000000" );
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 1000000" );
+                "select * from dispatch_person limit 500000" );        // includes vehicle info
+        Payload sysuserbasePayload = new JdbcPayload( hds,
+                "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
+        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 500000" );
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 500000" );
 
         List<Map<String, String>> fp = distypePayload.getPayload().collect( Collectors.toList() );
         Payload unitPayload = new SimplePayload( fp.stream().filter( row -> containsUnit( row ) ) );
@@ -100,7 +98,7 @@ public class Dispatch {
                     .createEntities()
                         .addEntity("Personnelsysuserbase")
                             .to("JCJIPersonnel")
-//                            .useCurrentSync()
+                            .useCurrentSync()
                             .addProperty("publicsafety.personnelid", "OfficerId")
                             .addProperty("publicsafety.personneltitle", "Title")
                             .addProperty("publicsafety.agencyid", "ORI")
@@ -111,7 +109,7 @@ public class Dispatch {
                         .endEntity()
                         .addEntity( "Peoplesysuserbase" )
                         .to("IowaCityPeople1")
-//                        .useCurrentSync()
+                        .useCurrentSync()
                         .addProperty("nc.PersonGivenName")
                             .value( row -> getFirstName( row.getAs( "FirstName" ) ) ).ok()
                             .addProperty("nc.PersonSurName")
@@ -121,7 +119,7 @@ public class Dispatch {
                     .endEntities()
                 .createAssociations()
                     .addAssociation( "isCJemployee" )
-//                    .useCurrentSync()
+                    .useCurrentSync()
                     .to("IowaCityIs")
                     .fromEntity( "Peoplesysuserbase" )
                     .toEntity( "Personnelsysuserbase" )
@@ -145,9 +143,11 @@ public class Dispatch {
                             .addProperty( "publicsafety.cfscaseid", "Case_ID" )
                             .addProperty("publicsafety.dispatchhowreported", "HowReported")
                             .addProperty("date.received")
-                                .value( row -> dateHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
+                                .value( row -> {
+                                    return timeHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) );
+                                } ).ok()
                             .addProperty( "date.dayofweek" )
-                                .value( row -> getDayOfWeek( ( dateHelper0.parse( row.getAs( "CFS_DateTimeJanet" ) ) ) ) )
+                                .value( row -> getDayOfWeek( ( timeHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) ) ) ) )
                                 .ok()
                             .addProperty( "publicsafety.cad_masterbusinessnumber", "MBI_No" )
                             .addProperty("publicsafety.dispatch911callnumber", "CallNumber_911")
@@ -293,7 +293,7 @@ public class Dispatch {
                             .useCurrentSync()
                             .fromEntity( "CallForService" )
                             .toEntity("Operator")
-                            .addProperty( "datetime.received" ).value( row -> dateHelper0.parseDate( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
+                            .addProperty( "datetime.received" ).value( row -> timeHelper0.parseDateAsDateTime( row.getAs( "CFS_DateTimeJanet" ) ) ).ok()
                         .endAssociation()
                      .addAssociation( "AppearsinDispatch1" )
                             .ofType( "general.appearsin" ).to("IowaCityCFSAppearsIn")
@@ -462,7 +462,7 @@ public class Dispatch {
                     .addProperty( "im.PersonNickName" )
                     .value( row -> getName( row.getAs( "OName" ) ) ).ok()
                     .addProperty( "nc.PersonBirthDate" )
-                      .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                      .value( row -> timeHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
                     .addProperty( "nc.SSN", "SSN" )
                     .addProperty( "nc.PersonSex")
                         .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
@@ -636,7 +636,7 @@ public class Dispatch {
                             .addProperty( "im.PersonNickName" )
                                 .value( row -> getName( row.getAs( "OName" ) ) ).ok()
                             .addProperty( "nc.PersonBirthDate" )
-                                .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                                .value( row -> timeHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
                             .addProperty( "nc.SSN", "SSN" )
                             .addProperty( "nc.PersonSex")
                                 .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
@@ -776,7 +776,7 @@ public class Dispatch {
                     .addProperty( "im.PersonNickName" )
                     .value( row -> getName( row.getAs( "OName" ) ) ).ok()
                     .addProperty( "nc.PersonBirthDate" )
-                      .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                      .value( row -> timeHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
                     .addProperty( "nc.SSN", "SSN" )
                     .addProperty( "nc.PersonSex")
                         .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
@@ -946,7 +946,7 @@ public class Dispatch {
                             .addProperty( "im.PersonNickName" )
                                 .value( row -> getName( row.getAs( "OName" ) ) ).ok()
                             .addProperty( "nc.PersonBirthDate" )
-                                .value( row -> dateHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
+                                .value( row -> timeHelper0.parseDate( row.getAs( "DOB" ) ) ).ok()
                             .addProperty( "nc.SSN", "SSN" )
                             .addProperty( "nc.PersonSex")
                                 .value( row -> standardSex( row.getAs( "OSex" ) ) ).ok()
@@ -1221,7 +1221,7 @@ public class Dispatch {
 
         Shuttle shuttle = new Shuttle( environment, jwtToken );
         Map<Flight, Payload> flights = new HashMap<>();
-//                flights.put( sysuserbaseMapping, sysuserbasePayload );
+                flights.put( sysuserbaseMapping, sysuserbasePayload );
                 flights.put( dispatchMapping, dispatchPayload );
                 flights.put( nonUnitMapping, nonUnitPayload );
                 flights.put( unitMapping, unitPayload );
