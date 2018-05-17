@@ -26,6 +26,7 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.openlattice.integrations.Iowacity_PD.lib.NameParsing.addSpaceAfterCommaUpperCase;
 import static com.openlattice.integrations.Iowacity_PD.lib.NameParsing.getFirstName;
@@ -44,19 +45,19 @@ public class Dispatch {
     private static final Logger logger = LoggerFactory
             .getLogger( Dispatch.class );
 
-    private static final Environment environment = Environment.PRODUCTION;
+    private static final Environment environment = Environment.LOCAL;
 
     private static final JavaDateTimeHelper timeHelper0 = new JavaDateTimeHelper( TimeZones.America_Chicago,
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss.S" );
 
     public static void main( String[] args ) throws InterruptedException, IOException {
 
-                final String username = args[ 0 ];                                            //for running on Atlas
-                final String password = args[ 1 ];                                            //for running on Atlas
-                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Atlas
-                final String integrationFile = args[ 2 ];                                     //for running on Atlas
-//        final String jwtToken = args[ 0 ];              //for local testing
-//        final String integrationFile = args[ 1 ];       //for local testing
+//                final String username = args[ 0 ];                                            //for running on Atlas
+//                final String password = args[ 1 ];                                            //for running on Atlas
+//                final String jwtToken = MissionControl.getIdToken( username, password );      //for running on Atlas
+//                final String integrationFile = args[ 2 ];                                     //for running on Atlas
+        final String jwtToken = args[ 0 ];              //for local testing
+        final String integrationFile = args[ 1 ];       //for local testing
 
         HikariDataSource hds =
                 ObjectMappers.getYamlMapper()
@@ -64,29 +65,28 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person limit 500000" );        // includes vehicle info
-        Payload sysuserbasePayload = new JdbcPayload( hds,
-                "select * from systemuserbase_partial" ); //TABLE NOT INCLUDED IN TEST RUN
-        Payload dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 500000" );
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 500000" );
+                "select * from dispatch_person limit 500000 offset 2000000" );        // includes vehicle info
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 500000 offset 2000000" );
 
-        List<Map<String, String>> fp = distypePayload.getPayload().collect( Collectors.toList() );
-        Payload unitPayload = new SimplePayload( fp.stream().filter( row -> containsUnit( row ) ) );
-        Payload nonUnitPayload = new SimplePayload( fp.stream().filter( row -> !containsUnit( row ) ) );
+//        Stream<Map<String, String>> sysuserbasePayload = new JdbcPayload( hds,
+//                "select * from systemuserbase_partial" ).getPayload(); //TABLE NOT INCLUDED IN TEST RUN
+        Stream<Map<String, String>> dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 500000 offset 2000000" ).getPayload();
 
-        List<Map<String, String>> fp2 = personPayload.getPayload().collect( Collectors.toList() );
-        Payload officersVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> containsVehicle( row ) && containsOfficer( row ) ) );
-        Payload officersNoVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> !containsVehicle( row ) && containsOfficer( row ) ) );
-        Payload othersVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> containsVehicle( row ) && containsOtherPerson( row ) ) );
-        Payload othersNoVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> !containsVehicle( row ) && containsOtherPerson( row ) ) );
-        Payload noPeopleVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) ) );
-        Payload noPeoplenoVehiclePayload = new SimplePayload( fp2.stream()
-                .filter( row -> !containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) ) );
+        Stream<Map<String, String>> unitPayload = distypePayload.getPayload().filter( row -> containsUnit( row ) );
+        Stream<Map<String, String>> nonUnitPayload = distypePayload.getPayload().filter( row -> !containsUnit( row ) );
+
+        Stream<Map<String, String>> officersVehiclePayload = personPayload.getPayload()
+                .filter( row -> containsVehicle( row ) && containsOfficer( row ) );
+        Stream<Map<String, String>> officersNoVehiclePayload = personPayload.getPayload()
+                .filter( row -> !containsVehicle( row ) && containsOfficer( row ) );
+        Stream<Map<String, String>> othersVehiclePayload = personPayload.getPayload()
+                .filter( row -> containsVehicle( row ) && containsOtherPerson( row ) );
+        Stream<Map<String, String>> othersNoVehiclePayload = personPayload.getPayload()
+                .filter( row -> !containsVehicle( row ) && containsOtherPerson( row ) );
+        Stream<Map<String, String>> noPeopleVehiclePayload = personPayload.getPayload()
+                .filter( row -> containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) );
+        Stream<Map<String, String>> noPeoplenoVehiclePayload = personPayload.getPayload()
+                .filter( row -> !containsVehicle( row ) && !containsOfficer( row ) && !containsOtherPerson( row ) );
 
         //Payload dispatchPayload = new FilterablePayload( dispatchPath );
         //        Map<String, String> caseIdToTime = dispatchPayload.getPayload()
@@ -1220,8 +1220,8 @@ public class Dispatch {
         // @formatter:on
 
         Shuttle shuttle = new Shuttle( environment, jwtToken );
-        Map<Flight, Payload> flights = new HashMap<>();
-                flights.put( sysuserbaseMapping, sysuserbasePayload );
+        Map<Flight, Stream<Map<String, String>>> flights = new HashMap<>();
+//                flights.put( sysuserbaseMapping, sysuserbasePayload );
                 flights.put( dispatchMapping, dispatchPayload );
                 flights.put( nonUnitMapping, nonUnitPayload );
                 flights.put( unitMapping, unitPayload );
@@ -1232,7 +1232,7 @@ public class Dispatch {
                 flights.put( noPeopleVehicleMapping, noPeopleVehiclePayload );
                 flights.put( noPeoplenoVehicleMapping, noPeoplenoVehiclePayload );
 
-        shuttle.launchPayloadFlight( flights );
+        shuttle.launch( flights );
 
     }
 
