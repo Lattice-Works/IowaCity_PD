@@ -65,12 +65,12 @@ public class Dispatch {
                         .getHikariDatasource( "jciowa" );
 
         Payload personPayload = new JdbcPayload( hds,
-                "select * from dispatch_person limit 500000 offset 2000000" );        // includes vehicle info
-        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type limit 500000 offset 2000000" );
+                "select * from dispatch_person" );        // includes vehicle info
+        Payload distypePayload = new JdbcPayload( hds, "select * from dispatch_type" );
 
-//        Stream<Map<String, String>> sysuserbasePayload = new JdbcPayload( hds,
-//                "select * from systemuserbase_partial" ).getPayload(); //TABLE NOT INCLUDED IN TEST RUN
-        Stream<Map<String, String>> dispatchPayload = new JdbcPayload( hds, "select * from dispatch limit 500000 offset 2000000" ).getPayload();
+        Stream<Map<String, String>> sysuserbasePayload = new JdbcPayload( hds,
+                "select * from systemuserbase_partial" ).getPayload(); //TABLE NOT INCLUDED IN TEST RUN
+        Stream<Map<String, String>> dispatchPayload = new JdbcPayload( hds, "select * from dispatch" ).getPayload();
 
         Stream<Map<String, String>> unitPayload = distypePayload.getPayload().filter( row -> containsUnit( row ) );
         Stream<Map<String, String>> nonUnitPayload = distypePayload.getPayload().filter( row -> !containsUnit( row ) );
@@ -1221,14 +1221,14 @@ public class Dispatch {
 
         Shuttle shuttle = new Shuttle( environment, jwtToken );
         Map<Flight, Stream<Map<String, String>>> flights = new HashMap<>();
-//                flights.put( sysuserbaseMapping, sysuserbasePayload );
+                flights.put( sysuserbaseMapping, sysuserbasePayload );
                 flights.put( dispatchMapping, dispatchPayload );
                 flights.put( nonUnitMapping, nonUnitPayload );
                 flights.put( unitMapping, unitPayload );
                 flights.put( officersVehicleMapping, officersVehiclePayload );
                 flights.put( officersNoVehicleMapping, officersNoVehiclePayload );
-        flights.put( othersVehicleMapping, othersVehiclePayload );
-        flights.put( othersNoVehicleMapping, othersNoVehiclePayload );
+                flights.put( othersVehicleMapping, othersVehiclePayload );
+                flights.put( othersNoVehicleMapping, othersNoVehiclePayload );
                 flights.put( noPeopleVehicleMapping, noPeopleVehiclePayload );
                 flights.put( noPeoplenoVehicleMapping, noPeoplenoVehiclePayload );
 
