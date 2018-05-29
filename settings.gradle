@@ -16,3 +16,6 @@ include 'services:webservice'
 */
 
 rootProject.name = 'IowaCity_PD'
+
+include ':shuttle'
+project(':shuttle').projectDir = new File('/Users/jokedurnez/Documents/openlattice-superproject/shuttle')
