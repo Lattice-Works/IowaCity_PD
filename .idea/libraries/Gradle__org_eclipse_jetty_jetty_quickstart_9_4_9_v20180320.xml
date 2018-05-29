@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: org.eclipse.jetty:jetty-quickstart:9.4.9.v20180320">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.eclipse.jetty/jetty-quickstart/9.4.9.v20180320/e29293da6fa927e2cf4d60964ab3e6e55fb916da/jetty-quickstart-9.4.9.v20180320.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.eclipse.jetty/jetty-quickstart/9.4.9.v20180320/e2dbc8ad5fbf6fba8dd6e0cd3016e9602bb32bba/jetty-quickstart-9.4.9.v20180320-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="Gradle: com.openlattice:rhizome:2.8.3-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/rhizome/2.8.3-SNAPSHOT/8397a4250eb8a88cdeb64f04331cf27923002ac4/rhizome-2.8.3-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/rhizome/2.8.3-SNAPSHOT/4ff5d6404c79b7ad4ba7f3f4d90d41b487d74039/rhizome-2.8.3-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/rhizome/2.8.3-SNAPSHOT/cc87e3c5d0397d45027d8d9371db87f2a1a70d48/rhizome-2.8.3-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/rhizome/2.8.3-SNAPSHOT/dc9bcd5ed4ad89b2aec59e39da8f54aaba22bf8f/rhizome-2.8.3-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/rhizome/2.8.3-SNAPSHOT/23acb47343ecf1d3652d72cbb396b88b531e7d8f/rhizome-2.8.3-SNAPSHOT-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

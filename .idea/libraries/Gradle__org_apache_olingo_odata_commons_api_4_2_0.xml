@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: org.apache.olingo:odata-commons-api:4.2.0">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.olingo/odata-commons-api/4.2.0/3e16a6d7eb390b41c3833069dd62628ccbd7b681/odata-commons-api-4.2.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.olingo/odata-commons-api/4.2.0/b6de3437abf94216031d0eb32164d05273837a8e/odata-commons-api-4.2.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

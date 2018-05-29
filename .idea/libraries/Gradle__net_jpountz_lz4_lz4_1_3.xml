@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: net.jpountz.lz4:lz4:1.3">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/net.jpountz.lz4/lz4/1.3/792d5e592f6f3f0c1a3337cd0ac84309b544f8f4/lz4-1.3.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/net.jpountz.lz4/lz4/1.3/fd15cffc52f8aa68ea7f21124977b622224ddef1/lz4-1.3-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

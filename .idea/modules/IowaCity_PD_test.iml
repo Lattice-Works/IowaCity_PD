@@ -11,7 +11,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="IowaCity_PD_main" />
     <orderEntry type="library" name="Gradle: com.microsoft.sqlserver:mssql-jdbc:6.2.2.jre8" level="project" />
-    <orderEntry type="library" name="Gradle: com.openlattice:shuttle:0.0.2-SNAPSHOT" level="project" />
+    <orderEntry type="module" module-name="shuttle_main" />
     <orderEntry type="library" name="Gradle: com.openlattice:api:0.0.8-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Gradle: com.openlattice:rhizome:2.8.3-SNAPSHOT" level="project" />
     <orderEntry type="library" name="Gradle: com.openlattice:rhizome-client:0.0.10-SNAPSHOT" level="project" />

@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="Gradle: com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.9.2">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-smile/2.9.2/a7cf50aff5bd96e3a0ba551a688bf402e2a594c3/jackson-dataformat-smile-2.9.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.fasterxml.jackson.dataformat/jackson-dataformat-smile/2.9.2/fb2ed8193ea7504bbfe99034544e5d56bead2755/jackson-dataformat-smile-2.9.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

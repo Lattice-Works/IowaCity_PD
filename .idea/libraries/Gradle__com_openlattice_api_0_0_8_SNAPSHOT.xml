@@ -1,0 +1,15 @@
+<component name="libraryTable">
+  <library name="Gradle: com.openlattice:api:0.0.8-SNAPSHOT">
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/adc0fb28cf29555b16f43930cf14327fa4cf923d/api-0.0.8-SNAPSHOT.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/d1201ce70ed2447641620b2d995ca83598363003/api-0.0.8-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/576102f1e9b488857d36a71d2bf810f240b94996/api-0.0.8-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/eb910844ea8219d5b800243364c7a189d6763093/api-0.0.8-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/3f17640dbaf1b6ec617c3da13c1a691355819741/api-0.0.8-SNAPSHOT-sources.jar!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.openlattice/api/0.0.8-SNAPSHOT/f96c5745c987538580bffc7fd092b0ee35612b14/api-0.0.8-SNAPSHOT-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>
