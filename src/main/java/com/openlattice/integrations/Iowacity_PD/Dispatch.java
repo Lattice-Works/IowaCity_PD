@@ -778,7 +778,8 @@ public class Dispatch {
                 .addEntity( "Person2OV" )       //justice-involved people, NOT officers.
                     .to( "SocratesJCPeople" )
                     .useCurrentSync()
-                    .addProperty( "nc.SubjectIdentification", "openlatticeid" )
+                    .addProperty( "nc.SubjectIdentification")
+                        .value( Dispatch::getDispatchPersonID ).ok()        //use OfficerID if present (consistent for officers), if not use ID.
                     .addProperty( "nc.PersonGivenName" )
                         .value( row -> getFirstName( row.getAs( "OName" ) ) ).ok()
                     .addProperty( "nc.PersonMiddleName" )
@@ -1405,8 +1406,7 @@ public class Dispatch {
         String id = row.getAs( "OfficerID" );
         if ( StringUtils.isNotBlank( id ) ) {
             return id;
-        }
-        return row.getAs( "ID" );
+        return row.getAs( "openlatticeid" );
     }
 
     public static String getType( Row row ) {
